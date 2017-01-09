@@ -3,7 +3,7 @@ package ntypespqt
 import (
 	"go/types"
 	"strings"
-	"fmt"
+
 	"github.com/piotrkowalczuk/pqt"
 	"github.com/piotrkowalczuk/pqt/pqtgo"
 )
@@ -13,21 +13,33 @@ type Plugin struct {
 	Visibility pqtgo.Visibility
 }
 
+// PropertyType implements pqtgo Plugin interface.
 func (*Plugin) PropertyType(c *pqt.Column, m int32) string {
 	switch {
 	case useString(c, m):
 		return "ntypes.String"
+	case useStringArray(c, m):
+		return "ntypes.StringArray"
 	case useInt64(c, m):
 		return "ntypes.Int64"
+	case useInt64Array(c, m):
+		return "ntypes.Int64Array"
+	case useFloat64(c, m):
+		return "ntypes.Float64"
+	case useFloat64Array(c, m):
+		return "ntypes.Float64Array"
 	case useBool(c, m):
 		return "ntypes.Bool"
+	case useBoolArray(c, m):
+		return "ntypes.BoolArray"
 	}
 	return ""
 }
 
 // WhereClause implements pqtgo Plugin interface.
 func (p *Plugin) WhereClause(c *pqt.Column) string {
-	txt := `if {{ .selector }}.Valid {
+	txt := `
+		if {{ .selector }}.Valid {
 			if {{ .composer }}.Dirty {
 				if _, err := {{ .composer }}.WriteString(", "); err != nil {
 					return "", nil, err
@@ -52,8 +64,10 @@ func (p *Plugin) WhereClause(c *pqt.Column) string {
 	return ""
 }
 
+// SetClause implements pqtgo Plugin interface.
 func (p *Plugin) SetClause(c *pqt.Column) string {
-	txt := `if {{ .selector }}.Valid {
+	txt := `
+		if {{ .selector }}.Valid {
 			if {{ .composer }}.Dirty {
 				if _, err := {{ .composer }}.WriteString(", "); err != nil {
 					return "", nil, err
@@ -74,20 +88,46 @@ func (p *Plugin) SetClause(c *pqt.Column) string {
 	switch {
 	case useString(c, 2):
 		return txt
+	case useStringArray(c, 2):
+		return txt
+	case useFloat64(c, 2):
+		return txt
+	case useFloat64Array(c, 2):
+		return txt
 	case useInt64(c, 2):
 		return txt
+	case useInt64Array(c, 2):
+		return txt
 	case useBool(c, 2), useBool(c, 3):
+		return txt
+	case useBoolArray(c, 2):
 		return txt
 	}
 	return ""
 }
 
+// Static implements pqtgo Plugin interface.
 func (p *Plugin) Static(s *pqt.Schema) string {
 	return ""
 }
 
+func useInt64Array(c *pqt.Column, m int32) (use bool) {
+	if ignore(c, m) {
+		return false
+	}
+	switch {
+	case strings.HasPrefix(c.Type.String(), "INTEGER["):
+		use = true
+	case strings.HasPrefix(c.Type.String(), "BIGINT["):
+		use = true
+	case strings.HasPrefix(c.Type.String(), "SMALLINT["):
+		use = true
+	}
+	return
+}
+
 func useInt64(c *pqt.Column, m int32) (use bool) {
-	if !(m == 2 || (m == 0 && !c.NotNull)) {
+	if ignore(c, m) {
 		return false
 	}
 	switch t := c.Type.(type) {
@@ -118,13 +158,44 @@ func useInt64(c *pqt.Column, m int32) (use bool) {
 			use = true
 		case pqt.TypeSerialSmall():
 			use = true
+		}
+	}
+	return
+}
+
+func useFloat64Array(c *pqt.Column, m int32) (use bool) {
+	if ignore(c, m) {
+		return false
+	}
+
+	switch {
+	case strings.HasPrefix(c.Type.String(), "DOUBLE PRECISION["):
+		use = true
+	}
+	return
+}
+
+func useFloat64(c *pqt.Column, m int32) (use bool) {
+	if ignore(c, m) {
+		return false
+	}
+	switch t := c.Type.(type) {
+	case pqtgo.BuiltinType:
+		switch types.BasicKind(t) {
+		case types.Float32:
+			use = true
+		case types.Float64:
+			use = true
+		}
+	case pqt.BaseType:
+		switch t {
+		case pqt.TypeDoublePrecision():
+			use = true
 		default:
 			switch {
-			case strings.HasPrefix(c.Name, "INTEGER["):
+			case strings.HasPrefix(t.String(), "DECIMAL"):
 				use = true
-			case strings.HasPrefix(c.Name, "BIGINT["):
-				use = true
-			case strings.HasPrefix(c.Name, "SMALLINT["):
+			case strings.HasPrefix(t.String(), "NUMERIC"):
 				use = true
 			}
 		}
@@ -132,11 +203,23 @@ func useInt64(c *pqt.Column, m int32) (use bool) {
 	return
 }
 
+func useStringArray(c *pqt.Column, m int32) (use bool) {
+	if ignore(c, m) {
+		return false
+	}
+	switch {
+	case strings.HasPrefix(c.Type.String(), "TEXT["):
+		use = true
+	case strings.HasPrefix(c.Type.String(), "VARCHAR["):
+		use = true
+	case strings.HasPrefix(c.Type.String(), "CHARACTER["):
+		use = true
+	}
+	return
+}
+
 func useString(c *pqt.Column, m int32) (use bool) {
-	if !(m == 2 || (m == 0 && !c.NotNull)) {
-		if c.Name == "description" {
-			fmt.Printf("%d - %#v\n", m, c)
-		}
+	if ignore(c, m) {
 		return false
 	}
 	switch t := c.Type.(type) {
@@ -152,10 +235,8 @@ func useString(c *pqt.Column, m int32) (use bool) {
 		case pqt.TypeUUID():
 			use = true
 		default:
-			switch {
-			case strings.HasPrefix(c.Name, "TEXT["):
-				use = true
-			case strings.HasPrefix(c.Name, "VARCHAR"), strings.HasPrefix(c.Name, "CHARACTER"):
+			switch c.Type.String() {
+			case "TEXT", "VARCHAR", "CHARACTER":
 				use = true
 			}
 		}
@@ -163,8 +244,19 @@ func useString(c *pqt.Column, m int32) (use bool) {
 	return
 }
 
+func useBoolArray(c *pqt.Column, m int32) (use bool) {
+	if ignore(c, m) {
+		return false
+	}
+	switch {
+	case strings.HasPrefix(c.Type.String(), "BOOL["):
+		use = true
+	}
+	return
+}
+
 func useBool(c *pqt.Column, m int32) (use bool) {
-	if m == 1 && c.NotNull {
+	if m == 1 && (c.NotNull || c.PrimaryKey) {
 		return false
 	}
 	switch t := c.Type.(type) {
@@ -177,12 +269,11 @@ func useBool(c *pqt.Column, m int32) (use bool) {
 		switch t {
 		case pqt.TypeBool():
 			use = true
-		default:
-			switch {
-			case strings.HasPrefix(c.Name, "BOOL["):
-				use = true
-			}
 		}
 	}
 	return
+}
+
+func ignore(c *pqt.Column, m int32) bool {
+	return !(m == 2 || (m < 2 && !c.PrimaryKey && !c.NotNull))
 }
