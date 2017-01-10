@@ -66,7 +66,8 @@ func (p *Plugin) WhereClause(c *pqt.Column) string {
 
 // SetClause implements pqtgo Plugin interface.
 func (p *Plugin) SetClause(c *pqt.Column) string {
-	txt := `
+	txt := func(t string) string {
+		r := `
 		if {{ .selector }}.Valid {
 			if {{ .composer }}.Dirty {
 				if _, err := {{ .composer }}.WriteString(", "); err != nil {
@@ -82,26 +83,41 @@ func (p *Plugin) SetClause(c *pqt.Column) string {
 			if err := {{ .composer }}.WritePlaceholder(); err != nil {
 				return "", nil, err
 			}
-			{{ .composer }}.Add({{ .selector }})
+			`
+		switch t {
+		case "string", "int64", "float64", "bool":
+			r+=`{{ .composer }}.Add({{ .selector }})`
+		case "string_array":
+			r+=`{{ .composer }}.Add(pq.StringArray({{ .selector }}.StringArray))`
+		case "int64_array":
+			r+=`{{ .composer }}.Add(pq.Int64Array({{ .selector }}.Int64Array))`
+		case "float64_array":
+			r+=`{{ .composer }}.Add(pq.Float64Array({{ .selector }}.Float64Array))`
+		case "bool_array":
+			r+=`{{ .composer }}.Add(pq.BoolArray({{ .selector }}.BoolArray))`
+		}
+		r += `
 			{{ .composer }}.Dirty=true
 		}`
+		return r
+	}
 	switch {
 	case useString(c, 2):
-		return txt
+		return txt("string")
 	case useStringArray(c, 2):
-		return txt
+		return txt("string_array")
 	case useFloat64(c, 2):
-		return txt
+		return txt("float64")
 	case useFloat64Array(c, 2):
-		return txt
+		return txt("float64_array")
 	case useInt64(c, 2):
-		return txt
+		return txt("int64")
 	case useInt64Array(c, 2):
-		return txt
+		return txt("int64_array")
 	case useBool(c, 2), useBool(c, 3):
-		return txt
+		return txt("bool")
 	case useBoolArray(c, 2):
-		return txt
+		return txt("bool_array")
 	}
 	return ""
 }
