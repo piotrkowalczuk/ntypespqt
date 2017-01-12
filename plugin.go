@@ -8,10 +8,8 @@ import (
 	"github.com/piotrkowalczuk/pqt/pqtgo"
 )
 
-type Plugin struct {
-	Formatter  *pqtgo.Formatter
-	Visibility pqtgo.Visibility
-}
+// Plugin ...
+type Plugin struct{}
 
 // PropertyType implements pqtgo Plugin interface.
 func (*Plugin) PropertyType(c *pqt.Column, m int32) string {
@@ -64,6 +62,43 @@ func (p *Plugin) WhereClause(c *pqt.Column) string {
 	return ""
 }
 
+// ScanClause implements pqtgo Plugin interface.
+func (p *Plugin) ScanClause(c *pqt.Column) string {
+	txt := func(t string) string {
+		switch t {
+		case "string_array":
+			return `&NullStringArray({{ .selector }})`
+		case "int64_array":
+			return `&NullInt64Array({{ .selector }})`
+		case "float64_array":
+			return `&NullFloat64Array({{ .selector }})`
+		case "bool_array":
+			return `&NullBool64Array({{ .selector }})`
+		default:
+			return ""
+		}
+	}
+	switch {
+	case useString(c, 2):
+		return txt("string")
+	case useStringArray(c, 2):
+		return txt("string_array")
+	case useFloat64(c, 2):
+		return txt("float64")
+	case useFloat64Array(c, 2):
+		return txt("float64_array")
+	case useInt64(c, 2):
+		return txt("int64")
+	case useInt64Array(c, 2):
+		return txt("int64_array")
+	case useBool(c, 2), useBool(c, 3):
+		return txt("bool")
+	case useBoolArray(c, 2):
+		return txt("bool_array")
+	}
+	return ""
+}
+
 // SetClause implements pqtgo Plugin interface.
 func (p *Plugin) SetClause(c *pqt.Column) string {
 	txt := func(t string) string {
@@ -86,15 +121,15 @@ func (p *Plugin) SetClause(c *pqt.Column) string {
 			`
 		switch t {
 		case "string", "int64", "float64", "bool":
-			r+=`{{ .composer }}.Add({{ .selector }})`
+			r += `{{ .composer }}.Add({{ .selector }})`
 		case "string_array":
-			r+=`{{ .composer }}.Add(pq.StringArray({{ .selector }}.StringArray))`
+			r += `{{ .composer }}.Add(pq.StringArray({{ .selector }}.StringArray))`
 		case "int64_array":
-			r+=`{{ .composer }}.Add(pq.Int64Array({{ .selector }}.Int64Array))`
+			r += `{{ .composer }}.Add(pq.Int64Array({{ .selector }}.Int64Array))`
 		case "float64_array":
-			r+=`{{ .composer }}.Add(pq.Float64Array({{ .selector }}.Float64Array))`
+			r += `{{ .composer }}.Add(pq.Float64Array({{ .selector }}.Float64Array))`
 		case "bool_array":
-			r+=`{{ .composer }}.Add(pq.BoolArray({{ .selector }}.BoolArray))`
+			r += `{{ .composer }}.Add(pq.BoolArray({{ .selector }}.BoolArray))`
 		}
 		r += `
 			{{ .composer }}.Dirty=true
