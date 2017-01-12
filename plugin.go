@@ -64,38 +64,6 @@ func (p *Plugin) WhereClause(c *pqt.Column) string {
 
 // ScanClause implements pqtgo Plugin interface.
 func (p *Plugin) ScanClause(c *pqt.Column) string {
-	txt := func(t string) string {
-		switch t {
-		case "string_array":
-			return `&NullStringArray({{ .selector }})`
-		case "int64_array":
-			return `&NullInt64Array({{ .selector }})`
-		case "float64_array":
-			return `&NullFloat64Array({{ .selector }})`
-		case "bool_array":
-			return `&NullBool64Array({{ .selector }})`
-		default:
-			return ""
-		}
-	}
-	switch {
-	case useString(c, 2):
-		return txt("string")
-	case useStringArray(c, 2):
-		return txt("string_array")
-	case useFloat64(c, 2):
-		return txt("float64")
-	case useFloat64Array(c, 2):
-		return txt("float64_array")
-	case useInt64(c, 2):
-		return txt("int64")
-	case useInt64Array(c, 2):
-		return txt("int64_array")
-	case useBool(c, 2), useBool(c, 3):
-		return txt("bool")
-	case useBoolArray(c, 2):
-		return txt("bool_array")
-	}
 	return ""
 }
 
