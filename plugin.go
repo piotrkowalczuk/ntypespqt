@@ -85,42 +85,65 @@ func (p *Plugin) SetClause(c *pqt.Column) string {
 			}
 			if err := {{ .composer }}.WritePlaceholder(); err != nil {
 				return "", nil, err
-			}
-			`
-		switch t {
-		case "string", "int64", "float64", "bool":
-			r += `{{ .composer }}.Add({{ .selector }})`
-		case "string_array":
-			r += `{{ .composer }}.Add(pq.StringArray({{ .selector }}.StringArray))`
-		case "int64_array":
-			r += `{{ .composer }}.Add(pq.Int64Array({{ .selector }}.Int64Array))`
-		case "float64_array":
-			r += `{{ .composer }}.Add(pq.Float64Array({{ .selector }}.Float64Array))`
-		case "bool_array":
-			r += `{{ .composer }}.Add(pq.BoolArray({{ .selector }}.BoolArray))`
-		}
+			}`
+		r += t
 		r += `
 			{{ .composer }}.Dirty=true
 		}`
 		return r
 	}
 	switch {
-	case useString(c, 2):
-		return txt("string")
+	case useString(c, 2), useFloat64(c, 2), useInt64(c, 2), useBool(c, 2), useBool(c, 3):
+		return txt(`
+		{{ .composer }}.Add({{ .selector }})`)
 	case useStringArray(c, 2):
-		return txt("string_array")
-	case useFloat64(c, 2):
-		return txt("float64")
+		switch c.NotNull {
+		case true:
+			return txt(`
+			if {{ .selector }}.StringArray == nil {
+				{{ .selector }}.StringArray = []string{}
+			}
+			{{ .composer }}.Add({{ .selector }})`)
+		case false:
+			return txt(`
+			{{ .composer }}.Add({{ .selector }})`)
+		}
 	case useFloat64Array(c, 2):
-		return txt("float64_array")
-	case useInt64(c, 2):
-		return txt("int64")
+		switch c.NotNull {
+		case true:
+			return txt(`
+			if {{ .selector }}.Float64Array == nil {
+				{{ .selector }}.Float64Array = []float64{}
+			}
+			{{ .composer }}.Add({{ .selector }})`)
+		case false:
+			return txt(`
+			{{ .composer }}.Add({{ .selector }})`)
+		}
 	case useInt64Array(c, 2):
-		return txt("int64_array")
-	case useBool(c, 2), useBool(c, 3):
-		return txt("bool")
+		switch c.NotNull {
+		case true:
+			return txt(`
+			if {{ .selector }}.Int64Array == nil {
+				{{ .selector }}.Int64Array = []int64{}
+			}
+			{{ .composer }}.Add({{ .selector }})`)
+		case false:
+			return txt(`
+			{{ .composer }}.Add({{ .selector }})`)
+		}
 	case useBoolArray(c, 2):
-		return txt("bool_array")
+		switch c.NotNull {
+		case true:
+			return txt(`
+			if {{ .selector }}.BoolArray == nil {
+				{{ .selector }}.BoolArray = []bool{}
+			}
+			{{ .composer }}.Add({{ .selector }})`)
+		case false:
+			return txt(`
+			{{ .composer }}.Add({{ .selector }})`)
+		}
 	}
 	return ""
 }
