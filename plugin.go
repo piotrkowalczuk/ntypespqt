@@ -40,17 +40,17 @@ func (p *Plugin) WhereClause(c *pqt.Column) string {
 		if {{ .selector }}.Valid {
 			if {{ .composer }}.Dirty {
 				if _, err := {{ .composer }}.WriteString(", "); err != nil {
-					return "", nil, err
+					return err
 				}
 			}
 			if _, err := {{ .composer }}.WriteString({{ .column }}); err != nil {
-				return "", nil, err
+				return err
 			}
 			if _, err := {{ .composer }}.WriteString("="); err != nil {
-				return "", nil, err
+				return err
 			}
 			if err := {{ .composer }}.WritePlaceholder(); err != nil {
-				return "", nil, err
+				return err
 			}
 			{{ .composer }}.Add({{ .selector }})
 			{{ .composer }}.Dirty=true
