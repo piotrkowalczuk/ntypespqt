@@ -43,7 +43,7 @@ func (p *Plugin) WhereClause(c *pqt.Column) string {
 					return err
 				}
 			}
-			if err := com.WriteAlias({{ .id }}); err != nil {
+			if err := {{ .composer }}.WriteAlias({{ .id }}); err != nil {
 				return err
 			}
 			if _, err := {{ .composer }}.WriteString({{ .column }}); err != nil {
