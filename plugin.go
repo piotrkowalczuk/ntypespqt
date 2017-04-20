@@ -39,7 +39,7 @@ func (p *Plugin) WhereClause(c *pqt.Column) string {
 	txt := `
 		if {{ .selector }}.Valid {
 			if {{ .composer }}.Dirty {
-				if _, err := {{ .composer }}.WriteString(", "); err != nil {
+				if _, err := {{ .composer }}.WriteString(" AND "); err != nil {
 					return err
 				}
 			}
