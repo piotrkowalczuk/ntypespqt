@@ -76,7 +76,7 @@ func (p *Plugin) SetClause(c *pqt.Column) string {
 		r := `
 		if {{ .selector }}.Valid {
 			if {{ .composer }}.Dirty {
-				if _, err := {{ .composer }}.WriteString(" AND "); err != nil {
+				if _, err := {{ .composer }}.WriteString(", "); err != nil {
 					return "", nil, err
 				}
 			}
