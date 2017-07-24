@@ -1,6 +1,7 @@
 package ntypespqt
 
 import (
+	"fmt"
 	"go/types"
 	"strings"
 
@@ -9,7 +10,8 @@ import (
 )
 
 // Plugin ...
-type Plugin struct{}
+type Plugin struct {
+}
 
 // PropertyType implements pqtgo Plugin interface.
 func (*Plugin) PropertyType(c *pqt.Column, m int32) string {
@@ -93,6 +95,24 @@ func (p *Plugin) SetClause(c *pqt.Column) string {
 		r += `
 			{{ .composer }}.Dirty=true
 		}`
+		if d, ok := c.DefaultOn(pqt.EventUpdate); ok {
+			r += fmt.Sprintf(`else {
+					if {{ .composer }}.Dirty {
+						if _, err := {{ .composer }}.WriteString(", "); err != nil {
+							return "", nil, err
+						}
+					}
+					if _, err := {{ .composer }}.WriteString({{ .column }}); err != nil {
+						return "", nil, err
+					}
+					if _, err := {{ .composer }}.WriteString("=%s"); err != nil {
+						return "", nil, err
+					}
+					{{ .composer }}.Dirty=true
+				}`,
+				d,
+			)
+		}
 		return r
 	}
 	switch {
